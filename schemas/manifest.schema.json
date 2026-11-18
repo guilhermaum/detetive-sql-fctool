@@ -198,7 +198,8 @@
             "boolean",
             "number",
             "text",
-            "select"
+            "select",
+            "repeater"
           ]
         },
         "label": {
@@ -260,6 +261,51 @@
         "help": {
           "type": "string",
           "maxLength": 500
+        },
+        "itemLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Rótulo de cada item repetido."
+        },
+        "addLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Texto do botão para adicionar um item."
+        },
+        "minItems": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "maxItems": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fields": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Campos exibidos em cada item do repeater.",
+          "additionalProperties": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/configField"
+              },
+              {
+                "not": {
+                  "properties": {
+                    "type": {
+                      "const": "repeater"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                }
+              }
+            ]
+          }
         }
       },
       "allOf": [
@@ -355,6 +401,36 @@
                   "string",
                   "number"
                 ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "repeater"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "fields"
+            ],
+            "properties": {
+              "default": {
+                "not": {}
+              },
+              "minItems": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "maxItems": {
+                "type": "integer",
+                "minimum": 1
               }
             }
           }

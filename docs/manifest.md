@@ -112,6 +112,47 @@ Exemplo:
 }
 ```
 
+### Campo repetível (`repeater`)
+
+O tipo `repeater` permite que o formulário do professor tenha zero ou mais grupos de campos com a mesma estrutura. Ele é declarado como um campo de configuração e recebe os campos internos em `fields`.
+
+```json
+"configuration": {
+  "steps": {
+    "type": "repeater",
+    "label": "Etapas",
+    "itemLabel": "Etapa",
+    "addLabel": "Adicionar etapa",
+    "minItems": 1,
+    "maxItems": 20,
+    "fields": {
+      "difficulty": {
+        "type": "select",
+        "label": "Dificuldade",
+        "options": ["facil", "medio", "dificil"],
+        "default": "medio"
+      },
+      "caseId": {
+        "type": "number",
+        "label": "ID do caso",
+        "min": 1,
+        "step": 1
+      }
+    }
+  }
+}
+```
+
+Propriedades específicas:
+
+- `fields`: objeto obrigatório com os campos exibidos em cada item; utiliza os mesmos tipos de campo já existentes;
+- `itemLabel`: rótulo de cada grupo, por exemplo, `Etapa`;
+- `addLabel`: texto do controle que adiciona um grupo;
+- `minItems`: quantidade mínima de grupos;
+- `maxItems`: quantidade máxima de grupos.
+
+O valor enviado em `payload.configuration.steps` é um array de objetos. Cada objeto contém os valores dos campos internos. Os campos internos seguem as mesmas regras de tipos, opções, valores padrão e validação dos campos normais. Nesta versão, o `repeater` não aceita outro `repeater` dentro de seus itens e não implementa carregamento dinâmico de opções por API nem regras condicionais de visibilidade entre campos.
+
 Regras de conformidade:
 
 - o jogo deve aguardar `INITIALIZE` antes de iniciar a experiência pedagógica;
