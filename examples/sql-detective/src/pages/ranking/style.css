@@ -1,0 +1,94 @@
+.ranking {
+  flex: 1;
+}
+
+.ranking h1 {
+  color: var(--secondary-color);
+}
+
+.ranking .ranking-case {
+  margin: 0.5rem 0 1rem;
+}
+
+.ranking .ranking-case-title {
+  margin: 0;
+  color: var(--secondary-color);
+}
+
+.ranking .ranking-case-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  margin: 0.25rem 0 0;
+  color: var(--dark-1);
+}
+
+.ranking-table-wrap {
+  width: 100%;
+  margin-top: 1.5rem;
+  overflow-x: auto;
+}
+
+.ranking .ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.ranking .ranking-col {
+  padding: 0.75rem 1rem;
+  border: var(--border-gray);
+}
+
+.ranking .ranking-table th {
+  background-color: var(--light-2);
+  color: var(--secondary-color);
+}
+
+.ranking .ranking-score,
+.ranking .ranking-id {
+  width: 20%;
+  min-width: 4rem;
+  white-space: nowrap;
+}
+
+.ranking .ranking-player {
+  width: 60%;
+}
+
+.ranking td.ranking-player::before {
+  content: "";
+  display: none;
+  margin-right: 0.75rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+}
+
+.ranking tbody tr:nth-child(1) td.ranking-player::before,
+.ranking tbody tr:nth-child(2) td.ranking-player::before,
+.ranking tbody tr:nth-child(3) td.ranking-player::before {
+  display: inline-block;
+}
+
+.ranking tbody tr:nth-child(1) td.ranking-player::before {
+  background-color: gold;
+}
+
+.ranking tbody tr:nth-child(2) td.ranking-player::before {
+  background-color: silver;
+}
+
+.ranking tbody tr:nth-child(3) td.ranking-player::before {
+  background-color: #cd7f32;
+}
+
+.ranking-message {
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 480px) {
+  .ranking .ranking-col {
+    padding: 0.65rem 0.75rem;
+  }
+}

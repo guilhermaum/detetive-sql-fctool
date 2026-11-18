@@ -1,0 +1,175 @@
+{
+  "fctoolGame": "1.0",
+  "id": "sql-detective",
+  "name": "Detetive SQL",
+  "version": "1.0.0",
+  "entrypoint": "index.html",
+  "metadata": {
+    "description": "Investigue casos de banco de dados usando consultas SQL. O professor configura a progressão, a dificuldade e a seleção dos casos.",
+    "author": "SQL Detective",
+    "language": "pt-BR",
+    "suggestedAreas": ["Computação"],
+    "suggestedSubjects": ["Banco de dados"],
+    "suggestedTopics": ["SQL", "Consultas", "Investigação de dados"],
+    "suggestedEducationLevels": ["Ensino médio", "Ensino superior"],
+    "keywords": ["SQL", "banco de dados", "investigação"]
+  },
+  "capabilities": {
+    "score": true,
+    "attempts": true,
+    "completion": true,
+    "customEvents": true
+  },
+  "configuration": {
+    "progression": {
+      "type": "select",
+      "label": "Progressão dos casos",
+      "options": [
+        {
+          "value": "single",
+          "label": "Apenas um caso"
+        },
+        {
+          "value": "sequence",
+          "label": "Avançar entre casos"
+        }
+      ],
+      "default": "single",
+      "required": true,
+      "help": "Escolha se o aluno resolverá apenas um caso ou avançará por várias etapas."
+    },
+    "caseFlow": {
+      "type": "repeater",
+      "label": "Caso da investigação",
+      "itemLabel": "Etapa",
+      "addLabel": "Adicionar próximo caso",
+      "minItems": 1,
+      "maxItems": 20,
+      "required": true,
+      "help": "Configure a dificuldade e a forma de seleção de cada fase. Para progressão única, mantenha apenas uma etapa.",
+      "fields": {
+        "difficulty": {
+          "type": "select",
+          "label": "Dificuldade",
+          "options": [
+            {
+              "value": "facil",
+              "label": "Fácil"
+            },
+            {
+              "value": "medio",
+              "label": "Médio"
+            },
+            {
+              "value": "dificil",
+              "label": "Difícil"
+            }
+          ],
+          "default": "medio",
+          "required": true,
+          "help": "Defina o nível de dificuldade para o caso."
+        },
+        "selectionMode": {
+          "type": "select",
+          "label": "Responsável pela seleção",
+          "options": [
+            {
+              "value": "teacher",
+              "label": "Professor"
+            },
+            {
+              "value": "system",
+              "label": "Sistema"
+            },
+            {
+              "value": "student",
+              "label": "Aluno"
+            }
+          ],
+          "default": "teacher",
+          "required": true,
+          "help": "Professor: informe um ID. Sistema ou aluno: informe os IDs disponíveis."
+        },
+        "caseId": {
+          "type": "number",
+          "label": "ID do caso (seleção do professor)",
+          "min": 1,
+          "step": 1,
+          "help": "Informe o ID do caso escolhido pelo professor. Deixe vazio nos modos Sistema e Aluno."
+        },
+        "distribution": {
+          "type": "select",
+          "label": "Distribuição (quando Sistema seleciona)",
+          "options": [
+            {
+              "value": "individual",
+              "label": "Sorteio individual por aluno"
+            },
+            {
+              "value": "class",
+              "label": "Mesmo caso para toda a turma"
+            }
+          ],
+          "default": "individual",
+          "required": true
+        }
+      }
+    },
+    "allowReplaySameCase": {
+      "type": "select",
+      "label": "Permitir jogar novamente o mesmo caso",
+      "options": [
+        {
+          "value": "sim",
+          "label": "Sim"
+        },
+        {
+          "value": "nao",
+          "label": "Não"
+        }
+      ],
+      "default": "nao",
+      "required": true,
+      "help": "Define se o aluno poderá jogar novamente um caso já concluído."
+    },
+    "rankingEnabled": {
+      "type": "select",
+      "label": "Habilitar Ranking por caso",
+      "options": [
+        {
+          "value": "sim",
+          "label": "Sim"
+        },
+        {
+          "value": "nao",
+          "label": "Não"
+        }
+      ],
+      "default": "nao",
+      "required": true,
+      "help": "Define se o ranking ficará habilitado nesta atividade."
+    },
+    "sessionContinuity": {
+      "type": "select",
+      "options": [
+        {
+          "value": "sim",
+          "label": "Sim"
+        },
+        {
+          "value": "nao",
+          "label": "Não"
+        }
+      ],
+      "label": "Continuidade da sessão",
+      "default": "nao",
+      "required": true,
+      "help": "Se habilitada, continua a sessao do mesmo jogador e caso, restaurando nivel, pontuacao e ajudas usadas sem solicitar o nome novamente. Se desabilitada, inicia uma nova sessao do inicio."
+    }
+  },
+  "responsive": {
+    "touch": true,
+    "orientations": ["portrait", "landscape"],
+    "preferredOrientation": "any"
+  }
+}

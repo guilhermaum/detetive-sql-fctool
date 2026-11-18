@@ -1,0 +1,75 @@
+{
+  "fctoolGame": "1.0",
+  "id": "sql-detective",
+  "name": "Detetive SQL",
+  "version": "1.0.0",
+  "entrypoint": "index.html",
+  "metadata": {
+        "description": "Investigue casos de banco de dados usando consultas SQL. A dificuldade e a distribuicao dos casos sao configuradas pelo professor.",
+    "author": "SQL Detective",
+    "language": "pt-BR",
+    "suggestedAreas": ["Computação"],
+    "suggestedSubjects": ["Banco de dados"],
+    "suggestedTopics": ["SQL", "Consultas", "Investigação de dados"],
+    "suggestedEducationLevels": ["Ensino médio", "Ensino superior"],
+    "keywords": ["SQL", "banco de dados", "investigação"]
+  },
+  "capabilities": {
+    "score": true,
+    "attempts": true,
+    "completion": true,
+    "customEvents": true
+  },
+  "configuration": {
+    "difficulty": {
+      "type": "select",
+      "label": "Dificuldade do caso",
+      "options": [
+        { "value": "facil", "label": "Fácil" },
+        { "value": "medio", "label": "Médio" },
+        { "value": "dificil", "label": "Difícil" }
+      ],
+      "default": "medio",
+      "required": true,
+      "help": "Escolha a dificuldade antes de iniciar. Um caso aleatório dessa dificuldade será carregado."
+    },
+    "caseDistribution": {
+      "type": "select",
+      "label": "Distribui\u00e7\u00e3o dos casos",
+      "options": [
+        { "value": "aleatorio", "label": "Casos aleat\u00f3rios" },
+        { "value": "mesmo", "label": "Mesmo caso para todos" }
+      ],
+      "default": "aleatorio",
+      "required": true,
+      "help": "Escolha se cada aluno receber\u00e1 um caso aleat\u00f3rio ou se todos receber\u00e3o o mesmo caso."
+    },
+    "rankingEnabled": {
+      "type": "select",
+      "label": "Habilitar Ranking por caso",
+      "options": [
+        { "value": "sim", "label": "Sim" },
+        { "value": "nao", "label": "N\u00e3o" }
+      ],
+      "default": "nao",
+      "required": true,
+      "help": "Define se o ranking ficará habilitado nesta atividade."
+    },
+    "sessionContinuity": {
+      "type": "select",
+      "options": [
+        { "value": "sim", "label": "Sim" },
+        { "value": "nao", "label": "N\u00e3o" }
+      ],
+      "label": "Continuidade da sessão",
+      "default": "nao",
+      "required": true,
+      "help": "Se habilitada, continua a sessao do mesmo jogador e caso, restaurando nivel, pontuacao e ajudas usadas sem solicitar o nome novamente. Se desabilitada, inicia uma nova sessao do inicio."
+    }
+  },
+  "responsive": {
+    "touch": true,
+    "orientations": ["portrait", "landscape"],
+    "preferredOrientation": "any"
+  }
+}

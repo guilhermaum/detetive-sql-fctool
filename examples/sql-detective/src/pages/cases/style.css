@@ -1,0 +1,64 @@
+.cases {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.cases h1,
+.cases p {
+  text-align: center;
+}
+
+.cases .logo {
+  max-width: 20rem;
+}
+
+.case-list {
+  width: 100%;
+  max-width: 46rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.case-card {
+  width: 100%;
+  height: 8rem;
+  justify-content: space-between;
+  text-align: left;
+  padding: 1rem;
+}
+
+.case-card-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.case-card-copy strong {
+  font-size: 1.25rem;
+}
+
+.case-card-copy span {
+  font-size: 0.95rem;
+}
+
+.case-card-copy strong,
+.case-card-copy span {
+  max-width: 100%;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.case-card:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}

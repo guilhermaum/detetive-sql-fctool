@@ -1,0 +1,24 @@
+.dead {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 3rem 2rem;
+}
+
+.dead .draw {
+  width: 100%;
+  max-width: 20rem;
+}
+
+.dead .description {
+  width: 100%;
+  max-width: 40rem;
+}
+
+.dead .control.btn {
+  width: 100%;
+  max-width: 25rem;
+}

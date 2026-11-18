@@ -1,0 +1,22 @@
+.bg-load {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.bg-load .load {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 2.5rem;
+  border: 0.5rem solid var(--dark-8);
+  border-right: 0.5rem solid var(--secondary-color);
+  animation: spin 0.8s infinite linear;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}

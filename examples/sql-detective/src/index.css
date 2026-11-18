@@ -1,0 +1,146 @@
+@import url('https://fonts.googleapis.com/css2?family=SUSE:wght@100..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap');
+
+* {
+  box-sizing: border-box;
+  font-family: "SUSE", sans-serif;
+
+  --primary-color: #5BA5FB;
+  --secondary-color: #3F3D56;
+  --light-1: #F3F3F3;
+  --light-2: #ECECEC;
+  --dark-1: #474747;
+  --dark-8: #9C9C9C;
+  --border-gray: 2px solid var(--dark-8);
+  --border-rounded: 0.8rem;
+}
+
+div,
+form,
+section,
+body,
+main,
+aside,
+ol,
+ul {
+  margin: 0;
+  padding: 0;
+}
+
+p,
+ul,
+ol,
+form {
+  font-size: 1.5rem;
+}
+
+p {
+  margin: 1rem 0;
+}
+
+button:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+}
+
+img {
+  max-width: 100%;
+}
+
+.icon {
+  --icon-size: 1.5rem;
+  width: var(--icon-size);
+  height: var(--icon-size);
+}
+
+.logo {
+  width: 100%;
+  max-width: 25rem;
+}
+
+.error {
+  font-size: 1rem;
+  color: tomato;
+}
+
+.central {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.container {
+  width: 90vw;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 0;
+}
+
+.control {
+  width: fit-content;
+  display: flex;
+  align-items: start;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  background-color: var(--light-2);
+  border: var(--border-gray);
+  color: var(--dark-1);
+  border-radius: var(--border-rounded);
+  transition: all 0.1s linear;
+}
+
+.control.btn {
+  align-items: center;
+  cursor: pointer;
+}
+
+.control.btn:hover,
+.control.btn:focus {
+  transform: scale(1.05);
+  box-shadow: 0 5px 10px #00000033;
+}
+
+.control.large {
+  font-size: 1.5rem;
+  padding: 1rem;
+}
+
+.control.btn.large .icon {
+  --icon-size: 2rem;
+}
+
+.bg-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  background-color: #000000aa;
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 99999;
+}
+
+.control.btn.music {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+}
+
+@media (max-width: 770px) {
+  :root {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    font-size: 12px;
+  }
+}

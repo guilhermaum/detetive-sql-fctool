@@ -1,0 +1,46 @@
+.table-container {
+  width: 100%;
+  overflow: auto;
+  margin: 1rem 0;
+}
+
+.table-container .feedback {
+  font-size: 1rem;
+}
+
+.sql-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sql-form .query {
+  width: 100%;
+  max-height: 300px;
+  min-height: 100px;
+  resize: vertical;
+  padding: 1rem;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.sql-form-control {
+  display: flex;
+  gap: 1rem;
+}
+
+.sql-table {
+  border-collapse: collapse;
+}
+
+.sql-table th {
+  background-color: var(--light-2);
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.sql-table th,
+.sql-table td {
+  border: var(--border-gray);
+  padding: 0.8rem 1.5rem;
+  min-width: 150px;
+}

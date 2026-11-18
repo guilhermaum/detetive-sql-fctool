@@ -1,0 +1,37 @@
+.form-check {
+  font-size: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: start;
+  gap: 1rem;
+}
+
+.form-check .form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.form-check .control.group {
+  width: 100%;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.form-check .control.group label {
+  text-transform: capitalize;
+  padding: 1rem 0 1rem 1rem;
+}
+
+.form-check .control.group input[type="text"] {
+  width: 100%;
+  flex: 1;
+  align-self: stretch;
+  padding: 0 1rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: inherit;
+  background: transparent;
+  border: none;
+}

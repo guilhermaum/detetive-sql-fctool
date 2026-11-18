@@ -1,0 +1,32 @@
+.diagram {
+  width: 70vw;
+  height: 90vh;
+  max-width: 1800px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.diagram .control.btn {
+  border: none;
+  align-self: end;
+}
+
+.diagram .box {
+  width: 100%;
+  overflow: auto;
+}
+
+.diagram .box .image {
+  width: 100%;
+  min-width: 800px;
+  border-radius: var(--border-rounded);
+}
+
+@media (max-width: 768px) {
+  .diagram {
+    width: 90vw;
+  }
+}
