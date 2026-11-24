@@ -61,8 +61,9 @@ export default function FormCheck({ template, correct }: FormCheckProps) {
       console.error(err);
     } finally {
       emitFctoolEvent("answer_submitted", {
-        submitted_line: submittedLine,
+        submitted_line: JSON.stringify(submittedLine),
         success,
+        level_number: level.number,
       });
 
       if (levelCompleted && completedLevelEventSent.current !== level.id) {

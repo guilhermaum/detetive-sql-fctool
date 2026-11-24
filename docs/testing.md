@@ -26,7 +26,13 @@ http://localhost:8000/tools/mock-host.html?game=/examples/hello-game/index.html
 - telemetria customizada;
 - conclusão.
 
+Para `SCORE`, `COMPLETED` e `EVENT`, o Mock Host também valida o payload contra `manifest.outputs`. O log exibe `OUTPUT VÁLIDO` para mensagens aceitas ou `OUTPUT REJEITADO` acompanhado dos campos incompatíveis. Eventos customizados não declarados também são rejeitados.
+
 Esse teste não substitui a validação final dentro do FCTool, mas permite ao desenvolvedor trabalhar sem conhecer nem executar a plataforma.
+
+## Contexto simulado do roteiro
+
+O Mock Host permite informar IDs simulados para aluno, roteiro e card. Para simular a execução em diferentes partes de um mesmo roteiro, mantenha o **ID do roteiro** e altere o **ID do card** antes de reiniciar a sessão. O host envia esses valores em `studentId`, `scriptId` e `cardId` no `INITIALIZE`, separados da configuração pedagógica do card.
 
 
 ## Teste de viewport

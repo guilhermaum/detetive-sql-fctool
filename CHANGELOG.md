@@ -2,6 +2,9 @@
 
 ## 0.4.0
 
+- `manifest.outputs` passa a ser o contrato obrigatório de mensagens `GAME -> HOST`, substituindo `capabilities`;
+- Mock Host valida `SCORE`, `COMPLETED` e eventos customizados contra o contrato e registra diagnósticos no log;
+- eventos customizados precisam ser declarados e são tratados pela FCTool como logs de telemetria;
 - formalizado o ciclo completo de configuração: Manifest -> Card -> GameSession -> `INITIALIZE` -> jogo;
 - jogo passa a ter como requisito de conformidade aguardar `INITIALIZE` antes de iniciar a experiência pedagógica;
 - `INITIALIZE.configuration` é formalizado como snapshot da configuração efetiva do card;
@@ -9,6 +12,7 @@
 - opções `select` passam a aceitar também `{ value, label }`, preservando suporte aos valores primitivos existentes;
 - validador passa a verificar tipos de `default`, pertinência de defaults de `select`, limites/step numéricos, nomes de chaves e opções duplicadas;
 - Mock Host passa a ler o manifesto, gerar controles de configuração e enviar os valores escolhidos em `INITIALIZE`;
+- Mock Host permite simular `scriptId` e `cardId` para executar o jogo em diferentes pontos de um mesmo roteiro;
 - Hello Game demonstra seleção de fase inicial e dificuldade;
 - protocolo permanece FCTool Game Protocol 1.0 (clarificação/expansão compatível do contrato).
 

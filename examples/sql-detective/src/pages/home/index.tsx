@@ -6,6 +6,7 @@ import { useGame } from "../../context/game";
 import Load from "../../components/Load";
 import { findResumableGameSession } from "../../services/game-sessions";
 import {
+  getConfiguredDifficulty,
   getConfiguredSessionContinuity,
   getFctoolIdentity,
 } from "../../services/fctool";
@@ -32,8 +33,10 @@ export default () => {
     async function resumeSavedGame() {
       try {
         const identity = getFctoolIdentity() ?? {
-          cardId: "",
-          playerId: "",
+          scriptId: "local-script-001",
+          cardId: "local-card-001",
+          sessionId: "local-session-001",
+          playerId: "local-student-001",
         };
 
         const resumableSession = await findResumableGameSession(
@@ -70,7 +73,8 @@ export default () => {
 
     playSong();
     savePlayerName(trimmedName);
-    navigate("/cases");
+    const difficulty = getConfiguredDifficulty();
+    navigate(difficulty ? `/cases?difficulty=${difficulty}` : "/difficulty");
   }
 
   if (checkingSession) return <Load />;

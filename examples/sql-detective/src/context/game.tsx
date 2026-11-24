@@ -20,13 +20,15 @@ import {
 import {
   completeFctoolGame,
   emitFctoolEvent,
-  getConfiguredCaseFlow,
+  getConfiguredGameConfiguration,
   getConfiguredRankingEnabled,
   getConfiguredSessionContinuity,
   getFctoolIdentity,
+  reportFctoolScore,
   resumeFctoolGame,
 } from "../services/fctool";
 import { startFctoolGame } from "../services/fctool";
+import type { GameDifficulty } from "../models/gameConfiguration";
 
 const INITIAL_SCORE = 100;
 const INITIAL_HELPS = 10;
@@ -68,8 +70,9 @@ interface GameContextValue {
   isGameWon: boolean;
   isGameOver: boolean;
   gameStarted: boolean;
-  currentStepIndex: number;
-  hasNextCase: boolean;
+  currentCaseIndex: number;
+  currentDifficulty: GameDifficulty | null;
+  canAdvanceCases: boolean;
   completedCaseIds: number[];
   allowReplaySameCase: boolean;
 
@@ -77,14 +80,18 @@ interface GameContextValue {
     gameId: string,
     resumableSession: ResumableGameSession | undefined,
     identity: {
+      scriptId: string;
       cardId: string;
+      sessionId: string;
       playerId: string;
     },
+    difficulty?: GameDifficulty,
   ) => Promise<boolean>;
   savePlayerName: (name: string) => void;
   resetGame: () => void;
   nextGameLevel: () => void;
-  advanceCaseStep: () => void;
+  advanceToNextCase: (difficulty?: GameDifficulty) => void;
+  finishActivity: () => void;
   applySuccess: () => void;
   applyFault: () => Promise<void>;
   applyHelp: (hintId: number) => Promise<void>;
@@ -102,31 +109,33 @@ const GameContext = createContext<GameContextValue | null>(null);
 
 const GameProvider = ({ children }: GameProviderProps) => {
   const fctoolIdentity = getFctoolIdentity();
-  const flowProgressStorageKey = fctoolIdentity
-    ? `sql-detective:case-flow:${fctoolIdentity.cardId}:${fctoolIdentity.playerId}`
+  const activityProgressStorageKey = fctoolIdentity
+    ? `sql-detective:progress:${fctoolIdentity.cardId}:${fctoolIdentity.playerId}`
     : null;
 
-  function readSavedFlowProgress(): {
-    stepIndex: number;
+  function readSavedProgress(): {
+    caseIndex: number;
     completedCaseIds: number[];
+    difficulty: GameDifficulty | null;
   } {
-    if (!flowProgressStorageKey || !getConfiguredSessionContinuity()) {
-      return { stepIndex: 0, completedCaseIds: [] };
+    if (!activityProgressStorageKey || !getConfiguredSessionContinuity()) {
+      return { caseIndex: 0, completedCaseIds: [], difficulty: null };
     }
 
     try {
-      const raw = localStorage.getItem(flowProgressStorageKey);
-      if (!raw) return { stepIndex: 0, completedCaseIds: [] };
+      const raw = localStorage.getItem(activityProgressStorageKey);
+      if (!raw) return { caseIndex: 0, completedCaseIds: [], difficulty: null };
       const parsed = JSON.parse(raw) as {
-        stepIndex?: unknown;
+        caseIndex?: unknown;
         completedCaseIds?: unknown;
+        difficulty?: unknown;
       };
       return {
-        stepIndex:
-          typeof parsed.stepIndex === "number" &&
-          Number.isInteger(parsed.stepIndex) &&
-          parsed.stepIndex >= 0
-            ? parsed.stepIndex
+        caseIndex:
+          typeof parsed.caseIndex === "number" &&
+          Number.isInteger(parsed.caseIndex) &&
+          parsed.caseIndex >= 0
+            ? parsed.caseIndex
             : 0,
         completedCaseIds: Array.isArray(parsed.completedCaseIds)
           ? parsed.completedCaseIds.filter(
@@ -134,25 +143,35 @@ const GameProvider = ({ children }: GameProviderProps) => {
                 typeof id === "number" && Number.isInteger(id),
             )
           : [],
+        difficulty:
+          parsed.difficulty === "facil" ||
+          parsed.difficulty === "medio" ||
+          parsed.difficulty === "dificil"
+            ? parsed.difficulty
+            : null,
       };
     } catch {
-      return { stepIndex: 0, completedCaseIds: [] };
+      return { caseIndex: 0, completedCaseIds: [], difficulty: null };
     }
   }
 
-  const saveFlowProgress = useCallback(
-    (stepIndex: number, completedIds: number[]): void => {
-      if (!flowProgressStorageKey) return;
+  const saveProgress = useCallback(
+    (
+      caseIndex: number,
+      completedIds: number[],
+      difficulty: GameDifficulty | null,
+    ): void => {
+      if (!activityProgressStorageKey) return;
       try {
         localStorage.setItem(
-          flowProgressStorageKey,
-          JSON.stringify({ stepIndex, completedCaseIds: completedIds }),
+          activityProgressStorageKey,
+          JSON.stringify({ caseIndex, completedCaseIds: completedIds, difficulty }),
         );
       } catch {
         // A progressão continua funcionando durante a sessão atual.
       }
     },
-    [flowProgressStorageKey],
+    [activityProgressStorageKey],
   );
 
   const [gameStarted, setGameStarted] = useState(false);
@@ -170,7 +189,7 @@ const GameProvider = ({ children }: GameProviderProps) => {
   const [caseInfo, setCaseInfo] = useState<CaseInfo | null>(null);
 
   const [completedCaseIds, setCompletedCaseIds] = useState<number[]>(
-    () => readSavedFlowProgress().completedCaseIds,
+    () => readSavedProgress().completedCaseIds,
   );
 
   const [playerName, setPlayerName] = useState("");
@@ -191,15 +210,16 @@ const GameProvider = ({ children }: GameProviderProps) => {
 
   const [idxCurrentLevel, setIdxCurrentLevel] = useState(0);
 
-  const [currentStepIndex, setCurrentStepIndex] = useState(
-    () => readSavedFlowProgress().stepIndex,
+  const [currentCaseIndex, setCurrentCaseIndex] = useState(
+    () => readSavedProgress().caseIndex,
   );
 
-  const [caseFlow] = useState(() => getConfiguredCaseFlow());
-  const allowReplaySameCase = caseFlow.allowReplaySameCase;
-  const hasNextCase =
-    caseFlow.progression === "sequence" &&
-    currentStepIndex < caseFlow.steps.length - 1;
+  const [caseConfiguration] = useState(() => getConfiguredGameConfiguration());
+  const [currentDifficulty, setCurrentDifficulty] = useState<GameDifficulty | null>(
+    () => readSavedProgress().difficulty ?? caseConfiguration.difficulty,
+  );
+  const allowReplaySameCase = caseConfiguration.allowReplaySameCase;
+  const canAdvanceCases = caseConfiguration.progression === "sequence";
 
   const [scoreGame, setScoreGame] = useState(INITIAL_SCORE);
 
@@ -212,13 +232,20 @@ const GameProvider = ({ children }: GameProviderProps) => {
   const [isGameOver, setGameOver] = useState(false);
 
   const completionRequested = useRef<number | null>(null);
+  const activityCompleted = useRef(false);
   const startedLevelEvents = useRef<Set<string>>(new Set());
   const scoreGameRef = useRef(scoreGame);
 
   async function startGame(
     gameId: string,
     resumableSession: ResumableGameSession | undefined,
-    identity: { cardId: string; playerId: string },
+    identity: {
+      scriptId: string;
+      cardId: string;
+      sessionId: string;
+      playerId: string;
+    },
+    selectedDifficulty?: GameDifficulty,
   ): Promise<boolean> {
     setGameStarted(false);
     setLevel(null);
@@ -238,13 +265,16 @@ const GameProvider = ({ children }: GameProviderProps) => {
     setCompletionError(null);
     setCompletionRetryCount(0);
     completionRequested.current = null;
+    activityCompleted.current = false;
     startedLevelEvents.current.clear();
 
     const game = await findGame(
       String(resumableSession?.session.case_id ?? gameId),
     );
-    const expectedDifficulty = caseFlow.steps[currentStepIndex]?.difficulty;
-    const apiDifficultyByFlow: Record<string, string> = {
+    const expectedDifficulty = selectedDifficulty ?? (
+      resumableSession ? null : currentDifficulty ?? caseConfiguration.difficulty
+    );
+    const apiDifficultyValues: Record<GameDifficulty, string> = {
       facil: "easy",
       medio: "medium",
       dificil: "hard",
@@ -253,12 +283,20 @@ const GameProvider = ({ children }: GameProviderProps) => {
       !resumableSession &&
       expectedDifficulty &&
       game.difficulty.toLowerCase() !== expectedDifficulty &&
-      game.difficulty.toLowerCase() !== apiDifficultyByFlow[expectedDifficulty]
+      game.difficulty.toLowerCase() !== apiDifficultyValues[expectedDifficulty]
     ) {
       throw new Error(
-        `O caso ${game.name} não corresponde à dificuldade ${expectedDifficulty} configurada para esta etapa.`,
+        `O caso ${game.name} não corresponde à dificuldade ${expectedDifficulty} selecionada.`,
       );
     }
+    const gameDifficulty = expectedDifficulty ?? (
+      game.difficulty.toLowerCase() === "easy" || game.difficulty.toLowerCase() === "facil"
+        ? "facil"
+        : game.difficulty.toLowerCase() === "hard" || game.difficulty.toLowerCase() === "dificil"
+          ? "dificil"
+          : "medio"
+    );
+    setCurrentDifficulty(gameDifficulty);
 
     const firstLevelId = game.levels[0];
     if (!firstLevelId) {
@@ -292,9 +330,11 @@ const GameProvider = ({ children }: GameProviderProps) => {
         player_id: identity.playerId,
         player_name: selectedPlayerName,
         card_id: identity.cardId,
+        script_id: identity.scriptId,
+        session_id: identity.sessionId,
       }));
     if (!resumableSession) {
-      saveFlowProgress(currentStepIndex, completedCaseIds);
+      saveProgress(currentCaseIndex, completedCaseIds, gameDifficulty);
     }
 
     const currentProgress = resumableSession?.progress.find(
@@ -346,21 +386,29 @@ const GameProvider = ({ children }: GameProviderProps) => {
 
     const caseData = {
       case_id: Number(game.id),
+      script_id: identity.scriptId,
+      card_id: identity.cardId,
+      session_id: identity.sessionId,
       level_counts: game.levels.length,
       player_name: selectedPlayerName,
-      difficulty: caseFlow.steps[currentStepIndex]?.difficulty,
-      step_id: caseFlow.steps[currentStepIndex]?.id,
-      step_index: currentStepIndex,
+      difficulty: gameDifficulty,
+      case_index: currentCaseIndex,
+    };
+    const caseStartedData = {
+      case_id: Number(game.id),
+      level_counts: game.levels.length,
+      difficulty: gameDifficulty,
+      case_index: currentCaseIndex,
     };
     if (!resumableSession) {
-      if (currentStepIndex === 0) {
+      if (currentCaseIndex === 0) {
         startFctoolGame(caseData);
-      } else {
-        emitFctoolEvent("case_started", caseData);
       }
+      emitFctoolEvent("case_started", caseStartedData);
     } else {
       resumeFctoolGame(caseData);
     }
+    reportFctoolScore(resumableSession ? resumedScore : INITIAL_SCORE, INITIAL_SCORE);
 
     const firstStartedLevelKey = `${session.id}:${currentLevel.id}`;
     if (!startedLevelEvents.current.has(firstStartedLevelKey)) {
@@ -383,9 +431,9 @@ const GameProvider = ({ children }: GameProviderProps) => {
     setCaseId(null);
     setCaseInfo(null);
     setCompletedCaseIds([]);
-    if (flowProgressStorageKey) {
+    if (activityProgressStorageKey) {
       try {
-        localStorage.removeItem(flowProgressStorageKey);
+        localStorage.removeItem(activityProgressStorageKey);
       } catch {
         // A limpeza local não impede o reinício do jogo.
       }
@@ -401,7 +449,9 @@ const GameProvider = ({ children }: GameProviderProps) => {
     setLevelIds([]);
     setLastLevel(0);
     setIdxCurrentLevel(0);
-    setCurrentStepIndex(0);
+    setCurrentCaseIndex(0);
+    setCurrentDifficulty(caseConfiguration.difficulty);
+    activityCompleted.current = false;
     scoreGameRef.current = INITIAL_SCORE;
     setScoreGame(INITIAL_SCORE);
     setRemainingHelps(INITIAL_HELPS);
@@ -414,18 +464,19 @@ const GameProvider = ({ children }: GameProviderProps) => {
     setIdxCurrentLevel((index) => index + 1);
   }
 
-  function advanceCaseStep(): void {
-    if (!hasNextCase) return;
+  function advanceToNextCase(nextDifficulty = currentDifficulty ?? undefined): void {
+    if (!canAdvanceCases || !nextDifficulty) return;
 
-    const nextStepIndex = currentStepIndex + 1;
+    const nextCaseIndex = currentCaseIndex + 1;
     emitFctoolEvent("progression_advanced", {
-      previous_step: caseFlow.steps[currentStepIndex]?.id,
-      next_step: caseFlow.steps[nextStepIndex]?.id,
-      step_index: nextStepIndex,
+      previous_difficulty: currentDifficulty ?? nextDifficulty,
+      next_difficulty: nextDifficulty,
+      case_index: nextCaseIndex,
     });
 
-    setCurrentStepIndex(nextStepIndex);
-    saveFlowProgress(nextStepIndex, completedCaseIds);
+    setCurrentCaseIndex(nextCaseIndex);
+    setCurrentDifficulty(nextDifficulty);
+    saveProgress(nextCaseIndex, completedCaseIds, nextDifficulty);
     setGameStarted(false);
     setLevel(null);
     setDatabaseImageUrl(null);
@@ -449,6 +500,23 @@ const GameProvider = ({ children }: GameProviderProps) => {
     startedLevelEvents.current.clear();
   }
 
+  function finishActivity(): void {
+    if (activityCompleted.current) return;
+    activityCompleted.current = true;
+    completeFctoolGame(finalScore ?? scoreGame, INITIAL_SCORE, {
+      ...(caseId !== null ? { case_id: caseId } : {}),
+      ...(currentDifficulty ? { difficulty: currentDifficulty } : {}),
+      completed_cases: completedCaseIds.length,
+    });
+    if (activityProgressStorageKey) {
+      try {
+        localStorage.removeItem(activityProgressStorageKey);
+      } catch {
+        // A limpeza local não impede o encerramento da atividade.
+      }
+    }
+  }
+
   function savePlayerName(name: string): void {
     setPlayerName(name.trim());
   }
@@ -465,6 +533,7 @@ const GameProvider = ({ children }: GameProviderProps) => {
     await saveGameSessionLevelScore(sessionId, level.id, nextScore);
     scoreGameRef.current = nextScore;
     setScoreGame(nextScore);
+    reportFctoolScore(nextScore, INITIAL_SCORE);
   }
 
   async function applyHelp(hintId: number): Promise<void> {
@@ -475,9 +544,11 @@ const GameProvider = ({ children }: GameProviderProps) => {
     if (remainingHelps <= 0) return;
     const nextScore = Math.max(scoreGame - 2, 0);
     await useGameSessionHint(sessionId, level.id, hintId, nextScore);
+    scoreGameRef.current = nextScore;
     setRemainingHelps((value) => value - 1);
     setUsedHintIds((ids) => (ids.includes(hintId) ? ids : [...ids, hintId]));
     setScoreGame(nextScore);
+    reportFctoolScore(nextScore, INITIAL_SCORE);
 
     const selectedHint = level.helps.find((hint) => hint.id === hintId);
     emitFctoolEvent("hint_used", {
@@ -566,12 +637,12 @@ const GameProvider = ({ children }: GameProviderProps) => {
             ? completedCaseIds
             : [...completedCaseIds, completedCaseId];
           setCompletedCaseIds(updatedCompletedCaseIds);
-          if (flowProgressStorageKey) {
-            if (hasNextCase) {
-              saveFlowProgress(currentStepIndex + 1, updatedCompletedCaseIds);
+          if (activityProgressStorageKey) {
+            if (canAdvanceCases) {
+              saveProgress(currentCaseIndex, updatedCompletedCaseIds, currentDifficulty);
             } else {
               try {
-                localStorage.removeItem(flowProgressStorageKey);
+                localStorage.removeItem(activityProgressStorageKey);
               } catch {
                 // A limpeza local não impede a conclusão da atividade.
               }
@@ -580,14 +651,15 @@ const GameProvider = ({ children }: GameProviderProps) => {
           emitFctoolEvent("case_completed", {
             case_id: completedCaseId,
             score: completedSession.score,
-            step_id: caseFlow.steps[currentStepIndex]?.id,
-            step_index: currentStepIndex,
+            difficulty: currentDifficulty,
+            case_index: currentCaseIndex,
           });
 
-          if (!hasNextCase) {
+          if (!canAdvanceCases) {
+            activityCompleted.current = true;
             completeFctoolGame(completedSession.score, INITIAL_SCORE, {
               case_id: completedCaseId,
-              completed_steps: currentStepIndex + 1,
+              completed_cases: updatedCompletedCaseIds.length,
             });
           }
         })
@@ -600,16 +672,16 @@ const GameProvider = ({ children }: GameProviderProps) => {
         });
     }
   }, [
-    caseFlow.steps,
+    canAdvanceCases,
     caseId,
     completedCaseIds,
     completionRetryCount,
-    currentStepIndex,
+    currentCaseIndex,
+    currentDifficulty,
     gameStarted,
     goals,
-    hasNextCase,
-    flowProgressStorageKey,
-    saveFlowProgress,
+    activityProgressStorageKey,
+    saveProgress,
     lastLevel,
     sessionId,
   ]);
@@ -635,8 +707,9 @@ const GameProvider = ({ children }: GameProviderProps) => {
         isGameWon,
         isGameOver,
         gameStarted,
-        currentStepIndex,
-        hasNextCase,
+        currentCaseIndex,
+        currentDifficulty,
+        canAdvanceCases,
         completedCaseIds,
         allowReplaySameCase,
 
@@ -644,7 +717,8 @@ const GameProvider = ({ children }: GameProviderProps) => {
         savePlayerName,
         resetGame,
         nextGameLevel,
-        advanceCaseStep,
+        advanceToNextCase,
+        finishActivity,
         applySuccess,
         applyFault,
         applyHelp,

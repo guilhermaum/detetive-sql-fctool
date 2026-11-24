@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "entrypoint": "index.html",
   "metadata": {
-    "description": "Investigue casos de banco de dados usando consultas SQL. O professor configura a progressão, a dificuldade e a seleção dos casos.",
+    "description": "Investigue casos de banco de dados usando consultas SQL. A atividade permite configurar dificuldade, seleção e progressão dos casos.",
     "author": "SQL Detective",
     "language": "pt-BR",
     "suggestedAreas": ["Computação"],
@@ -14,136 +14,231 @@
     "suggestedEducationLevels": ["Ensino médio", "Ensino superior"],
     "keywords": ["SQL", "banco de dados", "investigação"]
   },
-  "capabilities": {
-    "score": true,
-    "attempts": true,
-    "completion": true,
-    "customEvents": true
+  "outputs": {
+    "score": {
+      "enabled": true,
+      "minimum": 0,
+      "maximum": 100
+    },
+    "completion": {
+      "schema": {
+        "type": "object",
+        "required": ["score", "result"],
+        "properties": {
+          "score": { "type": "number", "minimum": 0, "maximum": 100 },
+          "result": { "type": "string", "enum": ["success", "failed"] },
+          "case_id": { "type": "integer", "minimum": 1 },
+          "difficulty": { "type": "string", "enum": ["facil", "medio", "dificil"] },
+          "completed_cases": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "events": {
+      "answer_submitted": {
+        "description": "Resposta enviada pelo estudante em uma fase.",
+        "schema": {
+          "type": "object",
+          "required": ["submitted_line", "success", "level_number"],
+          "properties": {
+            "submitted_line": { "type": "string" },
+            "success": { "type": "boolean" },
+            "level_number": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "case_already_played_in_another_card": {
+        "description": "A selecao foi ajustada porque o caso ja foi jogado em outro card.",
+        "schema": {
+          "type": "object",
+          "required": ["assigned_case_id", "difficulty", "case_index"],
+          "properties": {
+            "shared_case_id": { "type": "integer", "minimum": 1 },
+            "assigned_case_id": { "type": "integer", "minimum": 1 },
+            "difficulty": { "type": "string", "enum": ["facil", "medio", "dificil"] },
+            "case_index": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "case_already_played_in_script": {
+        "description": "A selecao foi ajustada porque o caso ja foi jogado neste roteiro.",
+        "schema": {
+          "type": "object",
+          "required": ["assigned_case_id", "difficulty", "case_index"],
+          "properties": {
+            "shared_case_id": { "type": "integer", "minimum": 1 },
+            "assigned_case_id": { "type": "integer", "minimum": 1 },
+            "difficulty": { "type": "string", "enum": ["facil", "medio", "dificil"] },
+            "case_index": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "case_completed": {
+        "description": "Um caso foi concluido.",
+        "schema": {
+          "type": "object",
+          "required": ["case_id", "score", "difficulty", "case_index"],
+          "properties": {
+            "case_id": { "type": "integer", "minimum": 1 },
+            "score": { "type": "number", "minimum": 0, "maximum": 100 },
+            "difficulty": { "type": "string", "enum": ["facil", "medio", "dificil"] },
+            "case_index": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "case_selected": {
+        "description": "O caso da rodada foi selecionado.",
+        "schema": {
+          "type": "object",
+          "required": ["case_id", "selection_mode", "case_index", "difficulty"],
+          "properties": {
+            "case_id": { "type": "integer", "minimum": 1 },
+            "selection_mode": { "type": "string", "enum": ["student", "individual", "class"] },
+            "case_index": { "type": "integer", "minimum": 0 },
+            "difficulty": { "type": "string", "enum": ["facil", "medio", "dificil"] },
+            "script_id": { "type": "string" },
+            "card_id": { "type": "string" },
+            "session_id": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "case_started": {
+        "description": "Um novo caso foi iniciado.",
+        "schema": {
+          "type": "object",
+          "required": ["case_id", "level_counts", "difficulty", "case_index"],
+          "properties": {
+            "case_id": { "type": "integer", "minimum": 1 },
+            "level_counts": { "type": "integer", "minimum": 1 },
+            "difficulty": { "type": "string", "enum": ["facil", "medio", "dificil"] },
+            "case_index": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "hint_used": {
+        "description": "Uma dica foi usada durante a partida.",
+        "schema": {
+          "type": "object",
+          "required": ["hint_id", "hint", "remaining_score"],
+          "properties": {
+            "hint_id": { "type": "integer", "minimum": 1 },
+            "hint": { "type": "string", "minLength": 1 },
+            "remaining_score": { "type": "number", "minimum": 0, "maximum": 100 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "level_completed": {
+        "description": "Uma fase foi concluida.",
+        "schema": {
+          "type": "object",
+          "required": ["level_completed", "final_score"],
+          "properties": {
+            "level_completed": { "type": "integer", "minimum": 1 },
+            "final_score": { "type": "number", "minimum": 0, "maximum": 100 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "level_started": {
+        "description": "Uma fase foi iniciada.",
+        "schema": {
+          "type": "object",
+          "required": ["level_started", "initial_score"],
+          "properties": {
+            "level_started": { "type": "integer", "minimum": 1 },
+            "initial_score": { "type": "number", "minimum": 0, "maximum": 100 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "progression_advanced": {
+        "description": "A progressao avancou para outro caso ou dificuldade.",
+        "schema": {
+          "type": "object",
+          "required": ["previous_difficulty", "next_difficulty", "case_index"],
+          "properties": {
+            "previous_difficulty": { "type": "string", "enum": ["facil", "medio", "dificil"] },
+            "next_difficulty": { "type": "string", "enum": ["facil", "medio", "dificil"] },
+            "case_index": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "sql_query_submitted": {
+        "description": "Uma consulta SQL foi enviada para execucao.",
+        "schema": {
+          "type": "object",
+          "required": ["query", "executed"],
+          "properties": {
+            "query": { "type": "string" },
+            "executed": { "type": "boolean" },
+            "error": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
   },
   "configuration": {
     "progression": {
       "type": "select",
-      "label": "Progressão dos casos",
+      "label": "Avançar entre casos",
       "options": [
-        {
-          "value": "single",
-          "label": "Apenas um caso"
-        },
-        {
-          "value": "sequence",
-          "label": "Avançar entre casos"
-        }
+        { "value": "single", "label": "Jogar um caso" },
+        { "value": "sequence", "label": "Permitir avançar entre casos" }
       ],
       "default": "single",
       "required": true,
-      "help": "Escolha se o aluno resolverá apenas um caso ou avançará por várias etapas."
+      "help": "Quando permitido, o aluno decide se quer jogar outro caso. Ao concluir todos os casos de uma dificuldade, poderá avançar para a próxima."
     },
-    "caseFlow": {
-      "type": "repeater",
-      "label": "Caso da investigação",
-      "itemLabel": "Etapa",
-      "addLabel": "Adicionar próximo caso",
-      "minItems": 1,
-      "maxItems": 20,
+    "difficulty": {
+      "type": "select",
+      "label": "Dificuldade inicial",
+      "options": [
+        { "value": "facil", "label": "Fácil" },
+        { "value": "medio", "label": "Médio" },
+        { "value": "dificil", "label": "Difícil" }
+      ],
+      "default": "medio",
       "required": true,
-      "help": "Configure a dificuldade e a forma de seleção de cada fase. Para progressão única, mantenha apenas uma etapa.",
-      "fields": {
-        "difficulty": {
-          "type": "select",
-          "label": "Dificuldade",
-          "options": [
-            {
-              "value": "facil",
-              "label": "Fácil"
-            },
-            {
-              "value": "medio",
-              "label": "Médio"
-            },
-            {
-              "value": "dificil",
-              "label": "Difícil"
-            }
-          ],
-          "default": "medio",
-          "required": true,
-          "help": "Defina o nível de dificuldade para o caso."
-        },
-        "selectionMode": {
-          "type": "select",
-          "label": "Responsável pela seleção",
-          "options": [
-            {
-              "value": "teacher",
-              "label": "Professor"
-            },
-            {
-              "value": "system",
-              "label": "Sistema"
-            },
-            {
-              "value": "student",
-              "label": "Aluno"
-            }
-          ],
-          "default": "teacher",
-          "required": true,
-          "help": "Professor: informe um ID. Sistema ou aluno: informe os IDs disponíveis."
-        },
-        "caseId": {
-          "type": "number",
-          "label": "ID do caso (seleção do professor)",
-          "min": 1,
-          "step": 1,
-          "help": "Informe o ID do caso escolhido pelo professor. Deixe vazio nos modos Sistema e Aluno."
-        },
-        "distribution": {
-          "type": "select",
-          "label": "Distribuição (quando Sistema seleciona)",
-          "options": [
-            {
-              "value": "individual",
-              "label": "Sorteio individual por aluno"
-            },
-            {
-              "value": "class",
-              "label": "Mesmo caso para toda a turma"
-            }
-          ],
-          "default": "individual",
-          "required": true
-        }
-      }
+      "help": "Define a dificuldade inicial. Depois de concluir todos os casos disponíveis, o aluno poderá seguir para a próxima dificuldade."
+    },
+    "caseSelection": {
+      "type": "select",
+      "label": "Quem escolhe os casos",
+      "options": [
+        { "value": "student", "label": "Escolha do aluno" },
+        { "value": "individual", "label": "Sorteio Individual" },
+        { "value": "class", "label": "Único caso para todos" }
+      ],
+      "default": "individual",
+      "required": true,
+      "help": "O aluno escolhe um caso na dificuldade atual, o sistema sorteia um caso diferente por aluno ou compartilha um caso com a turma."
     },
     "allowReplaySameCase": {
       "type": "select",
       "label": "Permitir jogar novamente o mesmo caso",
       "options": [
-        {
-          "value": "sim",
-          "label": "Sim"
-        },
-        {
-          "value": "nao",
-          "label": "Não"
-        }
+        { "value": "sim", "label": "Sim" },
+        { "value": "nao", "label": "Não" }
       ],
       "default": "nao",
       "required": true,
-      "help": "Define se o aluno poderá jogar novamente um caso já concluído."
+      "help": "Define se o aluno poderá repetir um caso já concluído."
     },
     "rankingEnabled": {
       "type": "select",
-      "label": "Habilitar Ranking por caso",
+      "label": "Habilitar ranking por caso",
       "options": [
-        {
-          "value": "sim",
-          "label": "Sim"
-        },
-        {
-          "value": "nao",
-          "label": "Não"
-        }
+        { "value": "sim", "label": "Sim" },
+        { "value": "nao", "label": "Não" }
       ],
       "default": "nao",
       "required": true,
@@ -151,20 +246,14 @@
     },
     "sessionContinuity": {
       "type": "select",
-      "options": [
-        {
-          "value": "sim",
-          "label": "Sim"
-        },
-        {
-          "value": "nao",
-          "label": "Não"
-        }
-      ],
       "label": "Continuidade da sessão",
+      "options": [
+        { "value": "sim", "label": "Sim" },
+        { "value": "nao", "label": "Não" }
+      ],
       "default": "nao",
       "required": true,
-      "help": "Se habilitada, continua a sessao do mesmo jogador e caso, restaurando nivel, pontuacao e ajudas usadas sem solicitar o nome novamente. Se desabilitada, inicia uma nova sessao do inicio."
+      "help": "Se habilitada, continua a sessão do mesmo jogador e caso, restaurando nível, pontuação e ajudas usadas sem solicitar o nome novamente."
     }
   },
   "responsive": {

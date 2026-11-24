@@ -18,96 +18,38 @@ def safe_name(name):
 def _select_value(option):
     return option.get('value') if isinstance(option, dict) else option
 
-def validate_config_field(field, prefix, errors, depth=0):
-    if depth > 8:
-        errors.append(f"{prefix}: profundidade máxima de campos aninhados excedida")
-        return
-    if not isinstance(field, dict):
-        errors.append(f"{prefix} deve ser objeto")
-        return
+def _is_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
-    typ = field.get('type')
-    allowed_types = {'boolean', 'number', 'text', 'select', 'repeater'}
-    if typ not in allowed_types:
-        errors.append(f"{prefix}.type inválido")
-        return
-    if not isinstance(field.get('label'), str) or not field.get('label', '').strip():
-        errors.append(f"{prefix}.label obrigatório")
-
-    has_default = 'default' in field
-    default = field.get('default')
-
-    if typ == 'boolean' and has_default and not isinstance(default, bool):
-        errors.append(f"{prefix}.default deve ser boolean")
-    elif typ == 'text' and has_default and not isinstance(default, str):
-        errors.append(f"{prefix}.default deve ser texto")
-    elif typ == 'number':
-        if has_default and (isinstance(default, bool) or not isinstance(default, (int, float))):
-            errors.append(f"{prefix}.default deve ser número")
-        for lim in ('min', 'max', 'step'):
-            if lim in field and (isinstance(field[lim], bool) or not isinstance(field[lim], (int, float))):
-                errors.append(f"{prefix}.{lim} deve ser número")
-        if isinstance(field.get('step'), (int, float)) and not isinstance(field.get('step'), bool) and field['step'] <= 0:
-            errors.append(f"{prefix}.step deve ser > 0")
-        if isinstance(field.get('min'), (int, float)) and isinstance(field.get('max'), (int, float)) and field['min'] > field['max']:
-            errors.append(f"{prefix}.min não pode ser maior que max")
-        if has_default and isinstance(default, (int, float)) and not isinstance(default, bool):
-            if isinstance(field.get('min'), (int, float)) and default < field['min']:
-                errors.append(f"{prefix}.default menor que min")
-            if isinstance(field.get('max'), (int, float)) and default > field['max']:
-                errors.append(f"{prefix}.default maior que max")
-    elif typ == 'select':
-        opts = field.get('options')
-        if not isinstance(opts, list) or not opts:
-            errors.append(f"{prefix}.options obrigatório para select")
+def validate_output_schema(schema, prefix):
+    errors=[]
+    if not isinstance(schema, dict): return [f'{prefix} deve ser objeto']
+    allowed={'type','required','properties','additionalProperties','enum','minimum','maximum','minLength','maxLength'}
+    for name in set(schema)-allowed: errors.append(f'{prefix}.{name} não é suportado')
+    typ=schema.get('type')
+    if typ not in {'object','string','number','integer','boolean'}: errors.append(f'{prefix}.type inválido')
+    if typ=='object':
+        props=schema.get('properties')
+        if not isinstance(props, dict): errors.append(f'{prefix}.properties deve ser objeto')
         else:
-            values = []
-            for i, opt in enumerate(opts):
-                if isinstance(opt, dict):
-                    if set(opt) - {'value', 'label'} or 'value' not in opt or 'label' not in opt or not isinstance(opt.get('label'), str) or not opt.get('label', '').strip() or isinstance(opt.get('value'), bool) or not isinstance(opt.get('value'), (str, int, float)):
-                        errors.append(f"{prefix}.options[{i}] deve ser valor string/número ou objeto {{value,label}} válido")
-                        continue
-                elif isinstance(opt, bool) or not isinstance(opt, (str, int, float)):
-                    errors.append(f"{prefix}.options[{i}] deve ser string/número ou objeto {{value,label}}")
-                    continue
-                values.append(_select_value(opt))
-            normalized = [(type(v).__name__, str(v)) for v in values]
-            if len(normalized) != len(set(normalized)):
-                errors.append(f"{prefix}.options contém valores duplicados")
-            if has_default and default not in values:
-                errors.append(f"{prefix}.default deve existir em options")
-    elif typ == 'repeater':
-        if depth > 0:
-            errors.append(f"{prefix}: repeater aninhado não é permitido")
-        if has_default:
-            errors.append(f"{prefix}.default não é permitido para repeater; use minItems e fields")
-        fields = field.get('fields')
-        if not isinstance(fields, dict) or not fields:
-            errors.append(f"{prefix}.fields deve ser um objeto com ao menos um campo")
-        else:
-            for child_name, child_field in fields.items():
-                if not re.match(r'^[A-Za-z][A-Za-z0-9_-]{0,79}$', str(child_name)):
-                    errors.append(f"{prefix}.fields.{child_name}: nome de chave inválido")
-                validate_config_field(child_field, f"{prefix}.fields.{child_name}", errors, depth + 1)
-        for label_key in ('itemLabel', 'addLabel'):
-            if label_key in field and (not isinstance(field[label_key], str) or not field[label_key].strip()):
-                errors.append(f"{prefix}.{label_key} deve ser texto não vazio")
-        for limit in ('minItems', 'maxItems'):
-            if limit in field and (isinstance(field[limit], bool) or not isinstance(field[limit], int)):
-                errors.append(f"{prefix}.{limit} deve ser inteiro")
-            elif limit in field and field[limit] < (0 if limit == 'minItems' else 1):
-                errors.append(f"{prefix}.{limit} inválido")
-        if isinstance(field.get('minItems'), int) and isinstance(field.get('maxItems'), int) and field['minItems'] > field['maxItems']:
-            errors.append(f"{prefix}.minItems não pode ser maior que maxItems")
-
-    if field.get('required') is True and not has_default:
-        # Válido: o professor será obrigado a escolher/preencher o campo.
-        pass
-
+            for name, child in props.items(): errors += validate_output_schema(child, f'{prefix}.properties.{name}')
+        required=schema.get('required',[])
+        if not isinstance(required,list) or any(not isinstance(v,str) for v in required): errors.append(f'{prefix}.required deve ser uma lista de textos')
+        elif isinstance(props,dict):
+            for name in required:
+                if name not in props: errors.append(f'{prefix}.required referencia propriedade inexistente: {name}')
+        if 'additionalProperties' in schema and not isinstance(schema['additionalProperties'],bool): errors.append(f'{prefix}.additionalProperties deve ser boolean')
+    if 'enum' in schema and (not isinstance(schema['enum'],list) or not schema['enum']): errors.append(f'{prefix}.enum deve ser uma lista não vazia')
+    for name in ('minimum','maximum'):
+        if name in schema and not _is_number(schema[name]): errors.append(f'{prefix}.{name} deve ser número')
+    if _is_number(schema.get('minimum')) and _is_number(schema.get('maximum')) and schema['minimum']>schema['maximum']: errors.append(f'{prefix}.minimum não pode ser maior que maximum')
+    for name in ('minLength','maxLength'):
+        if name in schema and (not isinstance(schema[name],int) or isinstance(schema[name],bool) or schema[name]<0): errors.append(f'{prefix}.{name} deve ser inteiro >= 0')
+    return errors
 
 def validate_manifest(m, exists):
     errors=[]
-    for k in ['fctoolGame','id','name','version','entrypoint','metadata','capabilities','responsive']:
+    for k in ['fctoolGame','id','name','version','entrypoint','metadata','outputs','responsive']:
         if k not in m: errors.append(f"campo obrigatório ausente: {k}")
     if m.get('fctoolGame') != '1.0': errors.append('fctoolGame deve ser "1.0"')
     if not ID_RE.match(str(m.get('id',''))): errors.append('id inválido')
@@ -121,8 +63,33 @@ def validate_manifest(m, exists):
         for k in ['suggestedAreas','suggestedSubjects','suggestedTopics','suggestedEducationLevels','keywords']:
             if k in md and (not isinstance(md[k], list) or any(not isinstance(v, str) or not v.strip() for v in md[k])):
                 errors.append(f'metadata.{k} deve ser uma lista de textos não vazios')
-    caps=m.get('capabilities',{})
-    if not isinstance(caps, dict) or caps.get('completion') is not True: errors.append('capabilities.completion deve ser true')
+    outputs=m.get('outputs',{})
+    if not isinstance(outputs,dict): errors.append('outputs deve ser objeto')
+    else:
+        for name in set(outputs)-{'score','completion','events'}: errors.append(f'outputs.{name} não é suportado')
+        score=outputs.get('score')
+        if not isinstance(score,dict) or not isinstance(score.get('enabled'),bool): errors.append('outputs.score.enabled deve ser boolean')
+        else:
+            for name in set(score)-{'enabled','minimum','maximum'}: errors.append(f'outputs.score.{name} não é suportado')
+        if isinstance(score,dict) and score.get('enabled'):
+            for name in ('minimum','maximum'):
+                if name in score and not _is_number(score[name]): errors.append(f'outputs.score.{name} deve ser número')
+            if _is_number(score.get('minimum')) and _is_number(score.get('maximum')) and score['minimum']>score['maximum']: errors.append('outputs.score.minimum não pode ser maior que maximum')
+        completion=outputs.get('completion')
+        if not isinstance(completion,dict) or 'schema' not in completion: errors.append('outputs.completion.schema é obrigatório')
+        elif isinstance(completion,dict):
+            for name in set(completion)-{'schema'}: errors.append(f'outputs.completion.{name} não é suportado')
+            errors += validate_output_schema(completion.get('schema'), 'outputs.completion.schema')
+        events=outputs.get('events')
+        if not isinstance(events,dict): errors.append('outputs.events deve ser objeto')
+        else:
+            for name,event in events.items():
+                prefix=f'outputs.events.{name}'
+                if not re.match(r'^[a-z][a-z0-9_]{0,79}$',str(name)): errors.append(f'{prefix}: nome de evento inválido')
+                if not isinstance(event,dict): errors.append(f'{prefix} deve ser objeto'); continue
+                for field_name in set(event)-{'description','schema'}: errors.append(f'{prefix}.{field_name} não é suportado')
+                if not isinstance(event.get('description'),str) or not event.get('description','').strip(): errors.append(f'{prefix}.description é obrigatória')
+                errors += validate_output_schema(event.get('schema'), f'{prefix}.schema')
     conf=m.get('configuration',{})
     if not isinstance(conf,dict): errors.append('configuration deve ser objeto')
     else:
@@ -130,7 +97,39 @@ def validate_manifest(m, exists):
             prefix=f'configuration.{name}'
             if not re.match(r'^[A-Za-z][A-Za-z0-9_-]{0,79}$', str(name)):
                 errors.append(f'{prefix}: nome de chave inválido')
-            validate_config_field(field, prefix, errors)
+            if not isinstance(field,dict): errors.append(f'{prefix} deve ser objeto'); continue
+            typ=field.get('type')
+            if typ not in {'boolean','number','text','select'}: errors.append(f'{prefix}.type inválido')
+            if not isinstance(field.get('label'),str) or not field.get('label','').strip(): errors.append(f'{prefix}.label obrigatório')
+            default=field.get('default', None); has_default='default' in field
+            if typ=='boolean' and has_default and not isinstance(default,bool): errors.append(f'{prefix}.default deve ser boolean')
+            if typ=='text' and has_default and not isinstance(default,str): errors.append(f'{prefix}.default deve ser texto')
+            if typ=='number':
+                if has_default and (isinstance(default,bool) or not isinstance(default,(int,float))): errors.append(f'{prefix}.default deve ser número')
+                for lim in ('min','max','step'):
+                    if lim in field and (isinstance(field[lim],bool) or not isinstance(field[lim],(int,float))): errors.append(f'{prefix}.{lim} deve ser número')
+                if isinstance(field.get('step'),(int,float)) and not isinstance(field.get('step'),bool) and field['step']<=0: errors.append(f'{prefix}.step deve ser > 0')
+                if isinstance(field.get('min'),(int,float)) and isinstance(field.get('max'),(int,float)) and field['min']>field['max']: errors.append(f'{prefix}.min não pode ser maior que max')
+                if has_default and isinstance(default,(int,float)) and not isinstance(default,bool):
+                    if isinstance(field.get('min'),(int,float)) and default<field['min']: errors.append(f'{prefix}.default menor que min')
+                    if isinstance(field.get('max'),(int,float)) and default>field['max']: errors.append(f'{prefix}.default maior que max')
+            if typ=='select':
+                opts=field.get('options')
+                if not isinstance(opts,list) or not opts: errors.append(f'{prefix}.options obrigatório para select')
+                else:
+                    values=[]
+                    for i,opt in enumerate(opts):
+                        if isinstance(opt,dict):
+                            if set(opt)-{'value','label'} or 'value' not in opt or 'label' not in opt or not isinstance(opt.get('label'),str) or not opt.get('label','').strip() or isinstance(opt.get('value'),bool) or not isinstance(opt.get('value'),(str,int,float)):
+                                errors.append(f'{prefix}.options[{i}] deve ser valor string/número ou objeto {{value,label}} válido'); continue
+                        elif isinstance(opt,bool) or not isinstance(opt,(str,int,float)):
+                            errors.append(f'{prefix}.options[{i}] deve ser string/número ou objeto {{value,label}}'); continue
+                        values.append(_select_value(opt))
+                    if len(values)!=len(set(map(lambda v:(type(v).__name__,str(v)),values))): errors.append(f'{prefix}.options contém valores duplicados')
+                    if has_default and default not in values: errors.append(f'{prefix}.default deve existir em options')
+            if field.get('required') is True and not has_default:
+                # válido: professor será obrigado a escolher; apenas informativo, sem erro
+                pass
     resp=m.get('responsive',{})
     if not isinstance(resp,dict) or resp.get('touch') is not True: errors.append('responsive.touch deve ser true')
     if isinstance(resp,dict) and (not isinstance(resp.get('orientations'),list) or not resp.get('orientations')): errors.append('responsive.orientations deve conter ao menos uma orientação')

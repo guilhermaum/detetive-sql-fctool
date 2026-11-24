@@ -79,7 +79,7 @@ export default function SqlQuery() {
       emitFctoolEvent("sql_query_submitted", {
         query,
         executed,
-        error,
+        error: error ?? "Sem erro de execução",
       });
     } catch (cause) {
       console.error("[FCTool] Erro ao enviar evento de consulta SQL: ", cause);

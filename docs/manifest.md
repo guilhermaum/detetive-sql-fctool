@@ -22,11 +22,24 @@ Exemplo:
     "suggestedEducationLevels": ["Ensino Médio"],
     "keywords": ["projéteis", "velocidade", "ângulo", "trajetória"]
   },
-  "capabilities": {
-    "score": true,
-    "attempts": true,
-    "completion": true,
-    "customEvents": true
+  "outputs": {
+    "score": {
+      "enabled": true,
+      "minimum": 0,
+      "maximum": 100
+    },
+    "completion": {
+      "schema": {
+        "type": "object",
+        "required": ["score", "result"],
+        "properties": {
+          "score": { "type": "number", "minimum": 0, "maximum": 100 },
+          "result": { "type": "string", "enum": ["success", "failed"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "events": {}
   },
   "configuration": {},
   "responsive": {
@@ -77,11 +90,56 @@ Na instalação, o FCTool poderá pré-preencher a classificação usando as sug
 - `version`: SemVer (`X.Y.Z`);
 - `entrypoint`: arquivo HTML dentro do pacote;
 - `metadata`: descrição e sugestões de classificação;
-- `capabilities`: recursos declarados pelo jogo;
+- `outputs`: contrato obrigatório das mensagens produzidas pelo jogo;
 - `configuration`: opções que o professor poderá configurar;
 - `responsive`: requisitos de responsividade e toque.
 
 O schema formal está em `schemas/manifest.schema.json`.
+
+## Contrato de outputs
+
+`outputs` declara o que a FCTool pode receber do jogo. A pontuação e a conclusão possuem significado padronizado para a plataforma; eventos customizados são validados e registrados como logs de telemetria.
+
+```text
+configuration = contrato HOST -> GAME
+outputs       = contrato GAME -> HOST
+```
+
+`outputs` é obrigatório e possui três partes:
+
+- `score`: habilita ou desabilita `SCORE` e, quando habilitado, define limites;
+- `completion.schema`: define o payload obrigatório de `COMPLETED`;
+- `events`: relaciona todos os nomes aceitos por `EVENT` e o schema de `data` de cada um.
+
+Exemplo de evento customizado:
+
+```json
+"events": {
+  "answer_submitted": {
+    "description": "Resposta enviada pelo estudante.",
+    "schema": {
+      "type": "object",
+      "required": ["questionId", "correct"],
+      "properties": {
+        "questionId": { "type": "string" },
+        "correct": { "type": "boolean" },
+        "attempt": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+```
+
+Os schemas de output usam um subconjunto deliberadamente pequeno de JSON Schema: `type`, `properties`, `required`, `additionalProperties`, `enum`, `minimum`, `maximum`, `minLength` e `maxLength`. Os tipos aceitos são `object`, `string`, `number`, `integer` e `boolean`.
+
+Regras de conformidade:
+
+- um jogo não pode enviar `SCORE` quando `outputs.score.enabled` for `false`;
+- todo `COMPLETED` deve corresponder a `outputs.completion.schema`;
+- todo `EVENT` deve estar declarado em `outputs.events` e seu `data` deve corresponder ao schema;
+- campos de contexto como `sessionId`, `studentId`, `scriptId`, `cardId` e o horário de recebimento são acrescentados pela FCTool, não pelo jogo;
+- mensagens inválidas devem ser rejeitadas e registradas para diagnóstico.
 
 
 ## Ciclo de vida da configuração
@@ -111,47 +169,6 @@ Exemplo:
   }
 }
 ```
-
-### Campo repetível (`repeater`)
-
-O tipo `repeater` permite que o formulário do professor tenha zero ou mais grupos de campos com a mesma estrutura. Ele é declarado como um campo de configuração e recebe os campos internos em `fields`.
-
-```json
-"configuration": {
-  "steps": {
-    "type": "repeater",
-    "label": "Etapas",
-    "itemLabel": "Etapa",
-    "addLabel": "Adicionar etapa",
-    "minItems": 1,
-    "maxItems": 20,
-    "fields": {
-      "difficulty": {
-        "type": "select",
-        "label": "Dificuldade",
-        "options": ["facil", "medio", "dificil"],
-        "default": "medio"
-      },
-      "caseId": {
-        "type": "number",
-        "label": "ID do caso",
-        "min": 1,
-        "step": 1
-      }
-    }
-  }
-}
-```
-
-Propriedades específicas:
-
-- `fields`: objeto obrigatório com os campos exibidos em cada item; utiliza os mesmos tipos de campo já existentes;
-- `itemLabel`: rótulo de cada grupo, por exemplo, `Etapa`;
-- `addLabel`: texto do controle que adiciona um grupo;
-- `minItems`: quantidade mínima de grupos;
-- `maxItems`: quantidade máxima de grupos.
-
-O valor enviado em `payload.configuration.steps` é um array de objetos. Cada objeto contém os valores dos campos internos. Os campos internos seguem as mesmas regras de tipos, opções, valores padrão e validação dos campos normais. Nesta versão, o `repeater` não aceita outro `repeater` dentro de seus itens e não implementa carregamento dinâmico de opções por API nem regras condicionais de visibilidade entre campos.
 
 Regras de conformidade:
 

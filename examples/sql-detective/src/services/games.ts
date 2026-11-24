@@ -22,6 +22,9 @@ type ApiCasesResponse =
 
 type CaseSelection = {
   case_id: number;
+  shared_case_id?: number;
+  fallback_used?: boolean;
+  fallback_reason?: "already_played_in_another_card" | "already_played_in_script";
 };
 
 function toCaseSummary(item: ApiCase): CaseSummary {
@@ -52,19 +55,27 @@ async function findCasesByDifficulty(
   );
 }
 
-async function selectCaseForPlayer(
-  cardId: string,
-  playerId: string,
-  difficulty: string,
-  caseDistribution: string,
-): Promise<string> {
-  const path = `/cards/${encodeURIComponent(cardId)}/cases/select`;
+async function selectCaseForPlayer(input: {
+  scriptId: string;
+  cardId: string;
+  sessionId: string;
+  playerId: string;
+  difficulty: string;
+  caseDistribution: "aleatorio" | "mesmo";
+  selectionIndex: number;
+  allowReplaySameCase: boolean;
+}): Promise<CaseSelection> {
+  const path = `/cards/${encodeURIComponent(input.cardId)}/cases/select`;
   const { data } = await api.post<CaseSelection>(path, {
-    player_id: playerId,
-    difficulty,
-    case_distribution: caseDistribution,
+    script_id: input.scriptId,
+    session_id: input.sessionId,
+    player_id: input.playerId,
+    difficulty: input.difficulty,
+    case_distribution: input.caseDistribution,
+    selection_index: input.selectionIndex,
+    allow_replay_same_case: input.allowReplaySameCase ? "sim" : "nao",
   });
-  return String(data.case_id);
+  return data;
 }
 
 async function findGame(id: string): Promise<Game> {

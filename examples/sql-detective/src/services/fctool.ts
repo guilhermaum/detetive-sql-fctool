@@ -1,9 +1,5 @@
 import { FCToolGame } from "./fctool-sdk";
-import type { CaseFlowConfig } from "../models/caseFlow";
-
-export type GameDifficulty = "facil" | "medio" | "dificil";
-
-export type CaseDistribution = "aleatorio" | "mesmo";
+import type { GameConfiguration, GameDifficulty, CaseSelectionMode } from "../models/gameConfiguration";
 
 let client: FCToolGame | null = null;
 
@@ -32,9 +28,15 @@ export async function initializeFctool(): Promise<Record<string, unknown>> {
   configuration = context.configuration;
   console.log(configuration);
 
+  const gameConfiguration = getConfiguredGameConfiguration();
   client.ready({
     appliedConfiguration: {
-      caseFlow: getConfiguredCaseFlow(),
+      progression: gameConfiguration.progression,
+      difficulty: gameConfiguration.difficulty,
+      caseSelection: gameConfiguration.selection,
+      allowReplaySameCase: gameConfiguration.allowReplaySameCase
+        ? "sim"
+        : "nao",
       rankingEnabled: getConfiguredRankingEnabled() ? "sim" : "nao",
       sessionContinuity: getConfiguredSessionContinuity() ? "sim" : "nao",
     },
@@ -43,117 +45,46 @@ export async function initializeFctool(): Promise<Record<string, unknown>> {
   return configuration;
 }
 
-type RawCaseFlowStep = {
-  difficulty?: unknown;
-  selectionMode?: unknown;
-  caseId?: unknown;
-  distribution?: unknown;
-  id?: unknown;
-};
-
-function normalizeDifficulty(value: unknown): "facil" | "medio" | "dificil" {
+function normalizeDifficulty(value: unknown): GameDifficulty | null {
   if (value === "facil" || value === "easy") return "facil";
+  if (value === "medio" || value === "medium") return "medio";
   if (value === "dificil" || value === "hard") return "dificil";
-  return "medio";
+  return null;
 }
 
 function normalizeBoolean(value: unknown): boolean {
   return value === true || value === "sim";
 }
 
-/**
- * Converte os valores enviados pelo repeater do Manifest para o modelo
- * utilizado pelo jogo. O repeater envia um array de linhas com
- * selectionMode/caseId/distribution; o jogo trabalha com selection.mode.
- */
-export function getConfiguredCaseFlow(): CaseFlowConfig {
-  const rawSteps = configuration.caseFlow;
-  const progression =
-    configuration.progression === "sequence" ? "sequence" : "single";
-  const allowReplaySameCase = normalizeBoolean(
-    configuration.allowReplaySameCase,
-  );
-
-  if (!Array.isArray(rawSteps) || rawSteps.length === 0) {
-    // Permite executar o jogo fora do FCTool durante o desenvolvimento.
-    return {
-      progression: "single",
-      allowReplaySameCase: true,
-      steps: [
-        {
-          id: "step-1",
-          difficulty: "medio",
-          selection: {
-            mode: "system",
-            distribution: "individual",
-          },
-        },
-      ],
-    };
+function normalizeCaseSelection(): CaseSelectionMode {
+  const selection = configuration.caseSelection;
+  if (
+    selection === "student" ||
+    selection === "individual" ||
+    selection === "class"
+  ) {
+    return selection;
   }
+  if (configuration.selectionMode === "student") return "student";
+  return configuration.caseDistribution === "class" ||
+    configuration.caseDistribution === "mesmo"
+    ? "class"
+    : "individual";
+}
 
-  const steps = rawSteps.map(
-    (item: unknown, index): CaseFlowConfig["steps"][number] => {
-      if (!item || typeof item !== "object") {
-        throw new Error(`A etapa ${index + 1} do caseFlow é inválida.`);
-      }
-
-      const raw = item as RawCaseFlowStep;
-      const mode =
-        raw.selectionMode === "teacher" ||
-        raw.selectionMode === "student" ||
-        raw.selectionMode === "system"
-          ? raw.selectionMode
-          : "teacher";
-
-      const caseId = Number(raw.caseId);
-      const distribution =
-        raw.distribution === "class" ? "class" : "individual";
-
-      if (mode === "teacher" && (!Number.isInteger(caseId) || caseId <= 0)) {
-        throw new Error(
-          `Informe um ID de caso válido na etapa ${index + 1}, pois a seleção está definida para o professor.`,
-        );
-      }
-
-      return {
-        id:
-          typeof raw.id === "string" && raw.id.trim()
-            ? raw.id
-            : `step-${index + 1}`,
-        difficulty: normalizeDifficulty(raw.difficulty),
-        selection: {
-          mode,
-          ...(mode === "teacher" ? { caseId } : {}),
-          ...(mode === "system" ? { distribution } : {}),
-        },
-      };
-    },
-  );
-
-  const activeSteps = progression === "single" ? steps.slice(0, 1) : steps;
-
-  if (!allowReplaySameCase) {
-    const fixedCaseIds = activeSteps
-      .filter((step) => step.selection.mode === "teacher")
-      .map((step) => step.selection.caseId)
-      .filter((id): id is number => typeof id === "number");
-    if (new Set(fixedCaseIds).size !== fixedCaseIds.length) {
-      throw new Error(
-        "O mesmo caso foi configurado em mais de uma etapa, mas a repetição está desativada.",
-      );
-    }
-  }
-
+export function getConfiguredGameConfiguration(): GameConfiguration {
   return {
-    progression,
-    allowReplaySameCase,
-    steps: activeSteps,
+    progression: configuration.progression === "sequence" ? "sequence" : "single",
+    difficulty: normalizeDifficulty(configuration.difficulty),
+    selection: normalizeCaseSelection(),
+    allowReplaySameCase: normalizeBoolean(configuration.allowReplaySameCase),
   };
 }
 
 export function getFctoolIdentity(): {
+  scriptId: string;
   cardId: string;
+  sessionId: string;
   playerId: string;
 } | null {
   const context = client?.getContext();
@@ -161,31 +92,21 @@ export function getFctoolIdentity(): {
   if (!context) return null;
 
   return {
-    cardId: context.sessionId,
-    playerId: context.studentId,
+    scriptId: context.scriptId ?? context.cardId ?? context.sessionId,
+    cardId: context.cardId ?? context.sessionId,
+    sessionId: context.sessionId,
+    playerId: context.studentId ?? "",
   };
 }
 
 export function getConfiguredDifficulty(): GameDifficulty | null {
-  const value = configuration.difficulty;
-
-  if (value === "facil" || value === "easy") {
-    return "facil";
-  }
-
-  if (value === "medio" || value === "medium") {
-    return "medio";
-  }
-
-  if (value === "dificil" || value === "hard") {
-    return "dificil";
-  }
-
-  return null;
+  return normalizeDifficulty(configuration.difficulty);
 }
 
-export function getConfiguredCaseDistribution(): CaseDistribution {
-  return configuration.caseDistribution === "mesmo" ? "mesmo" : "aleatorio";
+export function getConfiguredCaseDistribution(): "aleatorio" | "mesmo" {
+  return normalizeCaseSelection() === "class"
+    ? "mesmo"
+    : "aleatorio";
 }
 
 export function getConfiguredRankingEnabled(): boolean {

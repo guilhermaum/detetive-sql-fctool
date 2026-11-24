@@ -67,6 +67,8 @@ Opcionais, usados quando o jogo possui pausa explícita.
 }
 ```
 
+O jogo só pode enviar `SCORE` quando `manifest.outputs.score.enabled` for `true`. `value` deve respeitar `minimum` e `maximum`, quando declarados.
+
 ### EVENT
 
 Evento de telemetria extensível:
@@ -81,6 +83,8 @@ Evento de telemetria extensível:
 }
 ```
 
+O nome deve existir em `manifest.outputs.events` e `data` deve corresponder ao schema declarado para o evento. A FCTool valida e registra eventos customizados como logs de telemetria; eles não alteram automaticamente pontuação, conclusão ou progresso.
+
 ### COMPLETED
 
 ```json
@@ -89,6 +93,8 @@ Evento de telemetria extensível:
   "result": "success"
 }
 ```
+
+O payload deve corresponder a `manifest.outputs.completion.schema`. Apenas `COMPLETED` possui a semântica de encerrar com sucesso a GameSession; eventos customizados não substituem essa mensagem.
 
 ### ERROR
 
@@ -107,6 +113,8 @@ Evento de telemetria extensível:
 {
   "sessionId": "sessao-opaca",
   "studentId": "aluno-opaco-123",
+  "scriptId": "roteiro-opaco-456",
+  "cardId": "card-opaco-789",
   "configuration": {
     "difficulty": "medium",
     "sound": true
@@ -115,6 +123,8 @@ Evento de telemetria extensível:
 ```
 
 `studentId` é opcional e identifica de forma opaca o aluno associado à sessão quando o jogo precisa distinguir participantes. O jogo não deve inferir dados pessoais a partir dele nem tratá-lo como nome, e-mail ou matrícula. O FCTool não deve enviar dados pessoais desnecessários ao jogo.
+
+`scriptId` e `cardId` são opcionais e identificam, de forma opaca, o roteiro e o card em que a sessão foi iniciada. Eles permitem que o jogo reconheça o ponto de execução dentro de um roteiro sem acoplar-se à estrutura interna da plataforma. Cards diferentes de um mesmo roteiro compartilham o `scriptId` e possuem `cardId`s distintos. Esses IDs fazem parte do contexto da sessão e não de `configuration`.
 
 #### Semântica de `configuration`
 

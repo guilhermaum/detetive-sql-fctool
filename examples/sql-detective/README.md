@@ -23,13 +23,22 @@ local o frontend usa a API em `http://localhost:3000`. A API nao requer conta,
 credenciais ou configuracao do Firebase. Em producao, o frontend usa a API
 publicada no Vercel.
 
-O professor pode configurar a distribuicao como `aleatorio`, para que cada
-aluno receba um caso ainda nao jogado naquela dificuldade, ou `mesmo`, para
-que todos os alunos do mesmo card recebam o caso compartilhado pelo card.
+## Testes automatizados
+
+Na pasta do frontend, execute `npm test`. Os cenarios e as funcionalidades
+cobertas estao descritos em [TESTING.md](./TESTING.md).
+
+O manifesto configura a dificuldade inicial e o tipo de seleção: `student`
+(Escolha do aluno), `individual` (Sorteio Individual) ou `class` (Único caso
+para todos). O sorteio individual evita casos que o aluno já jogou naquele
+script. No modo de caso único, todos recebem o caso base do card, com uma
+alternativa individual quando o aluno já o jogou em outro card e a repetição
+está desativada.
 
 O jogo carrega os casos em `GET /cases`, inicia a partida em `POST /game-sessions`
 e envia cada consulta, uso de dica e conclusao para os endpoints da game-session.
-O jogo envia `player_id`, `player_name` e `card_id`. Com `sessionContinuity`
+O jogo envia `player_id`, `player_name`, `script_id`, `card_id` e `session_id`.
+Com `sessionContinuity`
 habilitado, busca a ultima partida do jogador naquele card e restaura
 automaticamente o caso, o nivel, a pontuacao acumulada e as dicas usadas sem
 solicitar o nome novamente.
@@ -202,20 +211,22 @@ Resultado:
 
 ## Fluxo de seleção e progressão dos casos
 
-O Manifest configura a progressão (`single` ou `sequence`) e define, em cada etapa,
-a dificuldade e o responsável pela seleção:
+O Manifest usa configurações simples para dificuldade inicial, escolha do caso,
+distribuição e progressão. Com a progressão `single`, a atividade termina após
+um caso. Com `sequence`, a tela de conclusão permite ao aluno jogar outro caso
+da dificuldade atual ou encerrar a atividade. Depois que todos os casos dessa
+dificuldade forem concluídos, ele poderá avançar para a próxima dificuldade.
 
-- `teacher`: inicia o caso informado no campo `caseId`;
-- `system`: utiliza `POST /cards/{cardId}/cases/select`, respeitando a dificuldade e
-  a distribuição (`individual` ou `class`);
-- `student`: consulta `GET /cases`, filtra os casos pela dificuldade e apresenta
-  uma tela para o aluno escolher.
+No modo `student`, a tela lista os casos da dificuldade atual. Nos modos
+`individual` e `class`, o jogo usa `POST /cards/{cardId}/cases/select`. A seleção
+`individual` sorteia um caso ainda não jogado pelo aluno no script. A seleção
+`class` atribui casos diferentes aos cards do mesmo script e compartilha o caso
+base do card com a turma. Se o aluno já tiver jogado o caso base em outro card e
+a repetição estiver desativada, o sistema sorteia uma alternativa ainda não
+jogada por ele e emite um evento para a FCTool.
 
-Quando a progressão é `sequence`, a tela de conclusão oferece a opção de avançar
-para a próxima etapa. Cada caso continua sendo registrado como uma game-session
-independente na API. O evento `case_completed` é enviado ao FCTool para cada caso,
-e a conclusão do jogo é enviada somente ao terminar a última etapa.
-
-A opção `allowReplaySameCase` impede IDs fixos repetidos em etapas configuradas
-pelo professor e remove da lista do aluno os casos já concluídos durante a execução
-atual. A seleção do sistema continua utilizando as regras de distribuição da API.
+Cada caso é registrado como uma game-session independente na API e gera um
+evento `case_completed` no FCTool. Em progressão `sequence`, o aluno encerra a
+atividade explicitamente na tela de conclusão; caso contrário, pode continuar
+para outro caso ou dificuldade. `allowReplaySameCase` controla a repetição de
+casos já concluídos.

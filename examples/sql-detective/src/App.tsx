@@ -7,6 +7,7 @@ import {
 
 import Root from "./pages/root";
 import Home from "./pages/home";
+import Difficulty from "./pages/difficulty";
 import Cases from "./pages/cases";
 import Level from "./pages/level";
 import Dead from "./pages/dead";
@@ -19,6 +20,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Root />}>
           <Route path="" element={<Home />} />
+
+          <Route path="difficulty" element={<Difficulty />} />
 
           <Route
             path="cases"

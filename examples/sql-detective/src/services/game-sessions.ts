@@ -5,6 +5,8 @@ export type StartGameSessionPayload = {
   card_id: string;
   player_id: string;
   player_name: string;
+  script_id?: string;
+  session_id?: string;
 };
 
 export type GameSession = {

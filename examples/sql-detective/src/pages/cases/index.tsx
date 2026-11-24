@@ -1,6 +1,6 @@
 import "./style.css";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   findCasesByDifficulty,
   selectCaseForPlayer,
@@ -10,132 +10,187 @@ import { useGame } from "../../context/game";
 import Load from "../../components/Load";
 import logo from "../../assets/detetive-sql.svg";
 import {
-  getConfiguredCaseFlow,
+  emitFctoolEvent,
+  getConfiguredGameConfiguration,
   getConfiguredSessionContinuity,
   getFctoolIdentity,
-  emitFctoolEvent,
 } from "../../services/fctool";
 import type { CaseSummary } from "../../models/game";
+import type { GameDifficulty } from "../../models/gameConfiguration";
 
-const apiDifficulties: Record<string, string> = {
+const apiDifficulties: Record<GameDifficulty, string> = {
   facil: "easy",
   medio: "medium",
   dificil: "hard",
 };
 
-const difficultyLabels: Record<string, string> = {
+const difficultyLabels: Record<GameDifficulty, string> = {
   facil: "Fácil",
   medio: "Médio",
   dificil: "Difícil",
 };
+
+const difficultyOrder: GameDifficulty[] = ["facil", "medio", "dificil"];
+
+async function findNextDifficultyWithCases(
+  difficulty: GameDifficulty,
+): Promise<GameDifficulty | null> {
+  try {
+    const currentIndex = difficultyOrder.indexOf(difficulty);
+    for (const nextDifficulty of difficultyOrder.slice(currentIndex + 1)) {
+      const cases = await findCasesByDifficulty(apiDifficulties[nextDifficulty]);
+      if (cases.length > 0) return nextDifficulty;
+    }
+  } catch (error) {
+    console.error("Não foi possível localizar a próxima dificuldade.", error);
+  }
+  return null;
+}
+
+function normalizeDifficulty(value: string | null): GameDifficulty | null {
+  if (value === "facil" || value === "easy") return "facil";
+  if (value === "medio" || value === "medium") return "medio";
+  if (value === "dificil" || value === "hard") return "dificil";
+  return null;
+}
 
 export default function Cases() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [availableCases, setAvailableCases] = useState<CaseSummary[]>([]);
   const [startingCaseId, setStartingCaseId] = useState<string | null>(null);
-  const { startGame, currentStepIndex, completedCaseIds } = useGame();
+  const [nextDifficulty, setNextDifficulty] = useState<GameDifficulty | null>(null);
+  const {
+    startGame,
+    currentCaseIndex,
+    currentDifficulty,
+    completedCaseIds,
+    advanceToNextCase,
+    canAdvanceCases,
+  } = useGame();
   const navigate = useNavigate();
-  const alreadyStarted = useRef(false);
-
-  const flow = getConfiguredCaseFlow();
-  const step = flow.steps[currentStepIndex] ??
-    flow.steps[0] ?? {
-      id: "step-1",
-      difficulty: "medio" as const,
-      selection: {
-        mode: "system" as const,
-        distribution: "individual" as const,
-      },
-    };
+  const [searchParams] = useSearchParams();
+  const configuration = getConfiguredGameConfiguration();
+  const startGameRef = useRef(startGame);
+  startGameRef.current = startGame;
+  const difficulty =
+    normalizeDifficulty(searchParams.get("difficulty")) ??
+    currentDifficulty ??
+    configuration.difficulty;
+  const startedKey = useRef<string | null>(null);
 
   useEffect(() => {
-    if (alreadyStarted.current) return;
-    alreadyStarted.current = true;
+    if (!difficulty) {
+      navigate("/difficulty", { replace: true });
+      return;
+    }
+    const selectedDifficulty = difficulty;
 
-    async function prepareStep() {
+    const key = `${selectedDifficulty}:${currentCaseIndex}:${completedCaseIds.join(",")}`;
+    if (startedKey.current === key) return;
+    startedKey.current = key;
+    let active = true;
+    setLoading(true);
+    setError("");
+    setNextDifficulty(null);
+
+    async function prepareCase() {
       try {
         const identity = getFctoolIdentity() ?? {
-          cardId: "",
-          playerId: "",
+          scriptId: "local-script-001",
+          cardId: "local-card-001",
+          sessionId: "local-session-001",
+          playerId: "local-student-001",
         };
 
-        // A continuidade tem prioridade: uma partida em andamento deve ser retomada
-        // antes de aplicar novamente a regra de seleção da etapa.
+        // Retoma primeiro uma partida em andamento, quando a continuidade está ativa.
         const resumableSession = getConfiguredSessionContinuity()
           ? await findResumableGameSession(identity.cardId, identity.playerId)
           : null;
 
+        if (!active) return;
         if (resumableSession) {
-          await startGame(
+          await startGameRef.current(
             String(resumableSession.session.case_id),
             resumableSession,
             identity,
           );
-          navigate("/level", { replace: true });
+          if (active) navigate("/level", { replace: true });
           return;
         }
 
-        if (!step) {
-          throw new Error("Nenhuma etapa foi configurada para esta atividade.");
-        }
-
-        if (step.selection.mode === "student") {
-          const cases = await findCasesByDifficulty(
-            apiDifficulties[step.difficulty],
-          );
-          const selectableCases = flow.allowReplaySameCase
+        const cases = await findCasesByDifficulty(apiDifficulties[selectedDifficulty]);
+        if (!active) return;
+        if (configuration.selection === "student") {
+          const selectableCases = configuration.allowReplaySameCase
             ? cases
             : cases.filter(
                 (item) => !completedCaseIds.includes(Number(item.id)),
               );
           setAvailableCases(selectableCases);
           if (selectableCases.length === 0) {
-            throw new Error(
-              `Não existem casos disponíveis com dificuldade ${difficultyLabels[step.difficulty]}.`,
+            setError(
+              `Você concluiu todos os casos de dificuldade ${difficultyLabels[selectedDifficulty]}.`,
             );
+            if (canAdvanceCases) {
+              const next = await findNextDifficultyWithCases(selectedDifficulty);
+              if (active) setNextDifficulty(next);
+            }
+            if (!active) return;
           }
           setLoading(false);
           return;
         }
 
-        let selectedCaseId: string;
+        const selectionIndex = cases.filter((item) =>
+          completedCaseIds.includes(Number(item.id)),
+        ).length;
+        const selection = await selectCaseForPlayer({
+          scriptId: identity.scriptId,
+          cardId: identity.cardId,
+          sessionId: identity.sessionId,
+          playerId: identity.playerId,
+          difficulty: apiDifficulties[selectedDifficulty],
+          caseDistribution: configuration.selection === "class" ? "mesmo" : "aleatorio",
+          selectionIndex,
+          allowReplaySameCase: configuration.allowReplaySameCase,
+        });
+        if (!active) return;
+        const selectedCaseId = String(selection.case_id);
 
-        if (step.selection.mode === "teacher") {
-          if (!step.selection.caseId) {
-            throw new Error(
-              `O professor não informou o ID do caso na etapa ${currentStepIndex + 1}.`,
-            );
-          }
-          selectedCaseId = String(step.selection.caseId);
-        } else {
-          // O endpoint já utilizado pela API realiza o sorteio e persiste
-          // a distribuição por aluno ou por turma.
-          const distribution =
-            step.selection.distribution === "class" ? "mesmo" : "aleatorio";
-
-          selectedCaseId = await selectCaseForPlayer(
-            identity.cardId,
-            identity.playerId,
-            apiDifficulties[step.difficulty],
-            distribution,
+        if (selection.fallback_used) {
+          emitFctoolEvent(
+            selection.fallback_reason === "already_played_in_another_card"
+              ? "case_already_played_in_another_card"
+              : "case_already_played_in_script",
+            {
+              ...(typeof selection.shared_case_id === "number" &&
+              Number.isInteger(selection.shared_case_id) &&
+              selection.shared_case_id > 0
+                ? { shared_case_id: selection.shared_case_id }
+                : {}),
+              assigned_case_id: selection.case_id,
+              difficulty: selectedDifficulty,
+              case_index: currentCaseIndex,
+            },
           );
         }
 
         emitFctoolEvent("case_selected", {
           case_id: Number(selectedCaseId),
-          selection_mode: step.selection.mode,
-          step_id: step.id,
-          step_index: currentStepIndex,
-          difficulty: step.difficulty,
+          selection_mode: configuration.selection,
+          case_index: currentCaseIndex,
+          difficulty: selectedDifficulty,
         });
-        await startGame(selectedCaseId, undefined, identity);
-        navigate("/level", { replace: true });
+        await startGameRef.current(selectedCaseId, undefined, identity, selectedDifficulty);
+        if (active) navigate("/level", { replace: true });
       } catch (cause) {
+        if (!active) return;
         console.error(cause);
-        const responseMessage = (
-          cause as { response?: { data?: { message?: string } } }
-        )?.response?.data?.message;
+        const response = cause as {
+          response?: { status?: number; data?: { message?: string } };
+        };
+        const responseMessage = response.response?.data?.message;
 
         setError(
           responseMessage ??
@@ -143,38 +198,48 @@ export default function Cases() {
               ? cause.message
               : "Não foi possível carregar os casos."),
         );
-        setLoading(false);
+        if (canAdvanceCases && response.response?.status === 409) {
+          const next = await findNextDifficultyWithCases(selectedDifficulty);
+          if (active) setNextDifficulty(next);
+        }
+        if (active) setLoading(false);
       }
     }
 
-    void prepareStep();
+    void prepareCase();
+    return () => {
+      active = false;
+      if (startedKey.current === key) startedKey.current = null;
+    };
   }, [
+    canAdvanceCases,
     completedCaseIds,
-    currentStepIndex,
-    flow.allowReplaySameCase,
+    configuration.allowReplaySameCase,
+    configuration.selection,
+    currentCaseIndex,
+    difficulty,
     navigate,
-    startGame,
-    step,
   ]);
 
   async function handleChooseCase(selectedCaseId: string) {
-    if (startingCaseId) return;
+    if (startingCaseId || !difficulty) return;
     setStartingCaseId(selectedCaseId);
     setError("");
 
     try {
       const identity = getFctoolIdentity() ?? {
-        cardId: "",
-        playerId: "",
+        scriptId: "local-script-001",
+        cardId: "local-card-001",
+        sessionId: "local-session-001",
+        playerId: "local-student-001",
       };
       emitFctoolEvent("case_selected", {
         case_id: Number(selectedCaseId),
         selection_mode: "student",
-        step_id: step.id,
-        step_index: currentStepIndex,
-        difficulty: step.difficulty,
+        case_index: currentCaseIndex,
+        difficulty,
       });
-      await startGame(selectedCaseId, undefined, identity);
+      await startGame(selectedCaseId, undefined, identity, difficulty);
       navigate("/level", { replace: true });
     } catch (cause) {
       console.error(cause);
@@ -187,17 +252,24 @@ export default function Cases() {
     }
   }
 
+  function handleNextDifficulty() {
+    if (!nextDifficulty) return;
+    advanceToNextCase(nextDifficulty);
+    navigate(`/cases?difficulty=${nextDifficulty}`, { replace: true });
+  }
+
   if (loading) return <Load />;
 
   return (
     <main className="cases container">
       <img src={logo} alt="Detetive SQL" className="logo" />
 
-      <h1>Escolha um caso para investigar</h1>
-      <p>
-        Etapa {currentStepIndex + 1} de {flow.steps.length} · Dificuldade:{" "}
-        {difficultyLabels[step.difficulty]}
-      </p>
+      <h1>
+        {configuration.selection === "student"
+          ? "Escolha um caso para investigar"
+          : "Carregando caso"}
+      </h1>
+      <p>Dificuldade: {difficulty ? difficultyLabels[difficulty] : ""}</p>
 
       {error && (
         <p className="error" role="alert">
@@ -225,7 +297,17 @@ export default function Cases() {
         ))}
       </div>
 
-      {error && (
+      {nextDifficulty && (
+        <button
+          type="button"
+          className="control btn"
+          onClick={handleNextDifficulty}
+        >
+          Avançar para {difficultyLabels[nextDifficulty]}
+        </button>
+      )}
+
+      {error && !nextDifficulty && (
         <button
           type="button"
           className="control btn"
